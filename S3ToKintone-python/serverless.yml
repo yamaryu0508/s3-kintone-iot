@@ -1,0 +1,62 @@
+service: S3ToKintone # NOTE: update this with your service name
+
+custom:
+  defaultStage: dev # dev/stage/prod
+  defaultRegion: ap-northeast-1 # AWS Region https://docs.aws.amazon.com/ja_jp/general/latest/gr/rande.html
+  defaultTZ: "Asia/Tokyo" # Timezone https://get.kintone.help/hc/en-us/articles/360003208872-Available-Time-Zones
+  defaultProfile: default # Profile for AWS CLI
+  defaultBucket: "kintone-iot"
+  defaultSubdomain: kintone-iot # kintone sub-domain
+  defaultAppId: "7"  # kintone ID of "IoT App."
+  defaultApiToken: 7dp0cK9xBhhDpjBJ5eMt7F2okRSeWKSnrzhE1XZA # kintone App API Token
+
+plugins:
+ - serverless-plugin-existing-s3
+
+provider:
+  name: aws
+  runtime: python3.6
+  stage: ${opt:stage, self:custom.defaultStage}
+  profile: ${opt:profile, self:custom.defaultProfile}
+  region: ${opt:region, self:custom.defaultRegion}
+
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:PutObject"
+        - "s3:GetObject"
+        - "s3:PutObjectAcl"
+        - "s3:ListBucket"
+        - "s3:DeleteObject"
+        - "s3:PutBucketNotification"
+      Resource:
+        - Fn::Join:
+            - ""
+            - - "arn:aws:s3:::"
+              - ${opt:bucket, self:custom.defaultBucket}
+        - Fn::Join:
+            - ""
+            - - "arn:aws:s3:::"
+              - ${opt:bucket, self:custom.defaultBucket}
+              - "/*"
+
+  environment:
+    SERVICE_NAME: ${self:service}
+    STAGE: ${self:provider.stage}
+    REGION: ${self:provider.region}
+    TZ: ${opt:tz, self:custom.defaultTZ}
+    S3_BUCKET: ${opt:bucket, self:custom.defaultBucket}
+    KINTONE_SUBDOMAIN: ${opt:subdomain, self:custom.defaultSubdomain}
+    KINTONE_APP_ID: ${opt:appId, self:custom.defaultAppId}
+    KINTONE_API_TOKEN: ${opt:apiToken, self:custom.defaultApiToken}
+
+functions:
+  createKintoneRecord:
+    handler: handler.lambda_handler
+    timeout: 30
+    events:
+      #- s3: ${opt:bucket, self:custom.defaultBucket}
+      - existingS3: # https://github.com/matt-filion/serverless-external-s3-event
+          bucket: ${opt:bucket, self:custom.defaultBucket}
+          events:
+            - s3:ObjectCreated:*
